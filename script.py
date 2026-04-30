@@ -6,7 +6,6 @@ from faster_whisper import WhisperModel
 
 INPUT_DIR = "input"
 APP_DIR = "app"
-MUSIC_DIR = "music"
 OUTPUT_DIR = "output"
 
 MODEL = WhisperModel("base")
@@ -99,7 +98,6 @@ def process(video):
     final = os.path.join(OUTPUT_DIR, f"{name}_final.mp4")
 
     app = os.path.join(APP_DIR, random.choice(os.listdir(APP_DIR)))
-    music = os.path.join(MUSIC_DIR, random.choice(os.listdir(MUSIC_DIR)))
 
     # Split
     run(f'ffmpeg -y -i "{video}" -t {split} -c copy "{before}"')
@@ -120,16 +118,13 @@ def process(video):
     hook = "This changed everything"
     subtitle_path = ass.replace("\\", "/").replace(":", "\\:")
 
-    # Final render
+    # FINAL RENDER (NO AUDIO → SILENT VIDEO)
     run(
-        f'ffmpeg -y -i "{merged}" -i "{music}" '
-        f'-filter_complex "'
-        f'[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,'
+        f'ffmpeg -y -i "{merged}" '
+        f'-vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,'
         f'subtitles=\'{subtitle_path}\','
-        f'drawtext=text=\'{hook}\':fontcolor=white:fontsize=80:x=(w-text_w)/2:y=100[v];'
-        f'[1:a]volume=0.4[a1];'
-        f'[0:a][a1]amix=inputs=2:duration=shortest[aout]" '
-        f'-map "[v]" -map "[aout]" -shortest "{final}"'
+        f'drawtext=text=\'{hook}\':fontcolor=white:fontsize=80:x=(w-text_w)/2:y=100" '
+        f'-an "{final}"'
     )
 
     # Cleanup
