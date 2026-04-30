@@ -15,18 +15,7 @@ def run(cmd):
     subprocess.run(cmd, shell=True, check=True)
 
 # -----------------------
-# 1. Download videos
-# -----------------------
-def download_all():
-    os.makedirs(INPUT_DIR, exist_ok=True)
-    with open("urls.txt") as f:
-        for url in f:
-            url = url.strip()
-            if url:
-                run(f'yt-dlp -o "{INPUT_DIR}/%(id)s.%(ext)s" "{url}"')
-
-# -----------------------
-# 2. Detect split (more stable)
+# 1. Detect split
 # -----------------------
 def detect_split(video):
     cap = cv2.VideoCapture(video)
@@ -59,22 +48,19 @@ def detect_split(video):
 
         prev = gray
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if not fps or fps <= 0:
-        fps = 30
-
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30
     cap.release()
     return split / fps
 
 # -----------------------
-# 3. Captions
+# 2. Captions
 # -----------------------
 def get_captions(video):
     segments, _ = MODEL.transcribe(video)
     return [(s.start, s.end, s.text.strip()) for s in segments]
 
 # -----------------------
-# 4. ASS conversion (fixed formatting)
+# 3. ASS formatting
 # -----------------------
 def format_time(t):
     h = int(t // 3600)
@@ -94,13 +80,13 @@ def make_ass(subs, filename):
         f.write("Format: Start,End,Style,Text\n")
 
         for s, e, t in subs:
-            t = t.replace(",", " ")  # prevent ASS break
+            t = t.replace(",", " ")
             f.write(f"Dialogue: {format_time(s)},{format_time(e)},Default,{t}\n")
 
     return path
 
 # -----------------------
-# 5. Processing
+# 4. Process one video
 # -----------------------
 def process(video):
     name = os.path.splitext(os.path.basename(video))[0]
@@ -115,7 +101,7 @@ def process(video):
     app = os.path.join(APP_DIR, random.choice(os.listdir(APP_DIR)))
     music = os.path.join(MUSIC_DIR, random.choice(os.listdir(MUSIC_DIR)))
 
-    # Split safely
+    # Split
     run(f'ffmpeg -y -i "{video}" -t {split} -c copy "{before}"')
     run(f'ffmpeg -y -i "{video}" -ss {split} -c copy "{after}"')
 
@@ -132,12 +118,9 @@ def process(video):
     ass = make_ass(subs, name)
 
     hook = "This changed everything"
-
-    # -----------------------
-    # FIXED FFMPEG PIPELINE
-    # -----------------------
     subtitle_path = ass.replace("\\", "/").replace(":", "\\:")
 
+    # Final render
     run(
         f'ffmpeg -y -i "{merged}" -i "{music}" '
         f'-filter_complex "'
@@ -157,11 +140,10 @@ def process(video):
     print("Done:", final)
 
 # -----------------------
-# 6. Run
+# 5. Run batch
 # -----------------------
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    download_all()
 
     for file in os.listdir(INPUT_DIR):
         if file.endswith(".mp4"):
